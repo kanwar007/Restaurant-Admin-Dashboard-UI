@@ -1,0 +1,14 @@
+services:
+  mock-api:
+    build: ./mock-api
+    ports:
+      - "4000:4000"
+
+  web:
+    build: ./web
+    environment:
+      MOCK_API_UPSTREAM: http://mock-api:4000
+    ports:
+      - "8080:8080"
+    depends_on:
+      - mock-api
