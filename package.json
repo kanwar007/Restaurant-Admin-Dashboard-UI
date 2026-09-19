@@ -1,0 +1,15 @@
+{
+  "name": "cafe-admin",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "install:all": "npm --prefix web install",
+    "dev": "node scripts/dev.js",
+    "lint": "npm --prefix web run lint",
+    "build": "npm --prefix web run build",
+    "test": "npm --prefix mock-api test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

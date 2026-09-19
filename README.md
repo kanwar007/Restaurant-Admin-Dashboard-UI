@@ -23,14 +23,23 @@ Prerequisite: Node.js >= 20 (`node -v`). npm ships with Node.
    cd Restaurant-Admin-Dashboard-UI
    ```
 
-2. Start the mock API (terminal 1) — no dependencies to install
+2. Install frontend dependencies and start both processes with one command
+
+   ```bash
+   npm run install:all
+   npm run dev      # mock API on :4000 + Vite on :5173
+   ```
+
+   Then open http://localhost:5173 and skip to step 5. To run them separately instead, use steps 3-4.
+
+3. Start the mock API (terminal 1) — no dependencies to install
 
    ```bash
    cd mock-api
    npm start        # Mock API listening on http://0.0.0.0:4000
    ```
 
-3. Start the frontend (terminal 2)
+4. Start the frontend (terminal 2)
 
    ```bash
    cd web
@@ -38,10 +47,10 @@ Prerequisite: Node.js >= 20 (`node -v`). npm ships with Node.
    npm run dev      # http://localhost:5173
    ```
 
-4. Open http://localhost:5173. Vite proxies `/api` to `http://localhost:4000`, so the dashboard loads
-   live mock data. Verify the API directly with `curl http://localhost:4000/api/health`.
+5. Open http://localhost:5173. Vite proxies `/api` to `http://127.0.0.1:4000`, so the dashboard loads
+   live mock data. Verify the API directly with `curl http://127.0.0.1:4000/api/health`.
 
-5. Reset the data at any time (mutations are in-memory)
+6. Reset the data at any time (mutations are in-memory)
 
    ```bash
    curl -X POST http://localhost:4000/api/reset
@@ -60,8 +69,9 @@ cd mock-api && npm test                        # mock API test suite
 
 Troubleshooting:
 
-- Port already in use: `PORT=4100 npm start` in `mock-api`, then `MOCK_API_URL=http://localhost:4100 npm run dev` in `web`.
-- Dashboard shows an error state: the mock API is not running — check terminal 1.
+- `[vite] http proxy error: /api/... ECONNREFUSED`: the mock API is not running on port 4000. Start it
+  (`cd mock-api && npm start`) or use `npm run dev` from the repo root, which starts both.
+- Port already in use: `PORT=4100 npm start` in `mock-api`, then `MOCK_API_URL=http://127.0.0.1:4100 npm run dev` in `web`.
 
 `MOCK_LATENCY_MS` (default `120`) adds artificial latency to every mock endpoint except `/api/health`.
 `VITE_API_BASE_URL` overrides the API base path (default `/api`).
