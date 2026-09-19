@@ -12,19 +12,56 @@ mock-api/   Node http mock API, no runtime dependencies
 deploy/k8s/ Kubernetes manifests (Deployments, Services, Ingress, HPAs)
 ```
 
-## Local development
+## Run locally
 
-```bash
-cd mock-api && npm start          # http://localhost:4000
-cd web && npm install && npm run dev   # http://localhost:5173, /api proxied to the mock API
-```
+Prerequisite: Node.js >= 20 (`node -v`). npm ships with Node.
+
+1. Clone and enter the repo
+
+   ```bash
+   git clone https://github.com/kanwar007/Restaurant-Admin-Dashboard-UI.git
+   cd Restaurant-Admin-Dashboard-UI
+   ```
+
+2. Start the mock API (terminal 1) — no dependencies to install
+
+   ```bash
+   cd mock-api
+   npm start        # Mock API listening on http://0.0.0.0:4000
+   ```
+
+3. Start the frontend (terminal 2)
+
+   ```bash
+   cd web
+   npm install
+   npm run dev      # http://localhost:5173
+   ```
+
+4. Open http://localhost:5173. Vite proxies `/api` to `http://localhost:4000`, so the dashboard loads
+   live mock data. Verify the API directly with `curl http://localhost:4000/api/health`.
+
+5. Reset the data at any time (mutations are in-memory)
+
+   ```bash
+   curl -X POST http://localhost:4000/api/reset
+   ```
+
+To run the whole stack in containers instead, see [Docker](#docker).
 
 Useful scripts:
 
 ```bash
-cd web      && npm run lint && npm run build
-cd mock-api && npm test
+cd web      && npm run lint && npm run build   # lint + production build into web/dist
+cd web      && npm run preview                 # serve the production build
+cd mock-api && npm run dev                     # mock API with file watching
+cd mock-api && npm test                        # mock API test suite
 ```
+
+Troubleshooting:
+
+- Port already in use: `PORT=4100 npm start` in `mock-api`, then `MOCK_API_URL=http://localhost:4100 npm run dev` in `web`.
+- Dashboard shows an error state: the mock API is not running — check terminal 1.
 
 `MOCK_LATENCY_MS` (default `120`) adds artificial latency to every mock endpoint except `/api/health`.
 `VITE_API_BASE_URL` overrides the API base path (default `/api`).
