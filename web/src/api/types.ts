@@ -13,9 +13,23 @@ export interface Restaurant {
 }
 
 export interface User {
+  id?: string;
+  username?: string;
   name: string;
   role: string;
   initials: string;
+}
+
+export interface LoginResponse {
+  token: string;
+  user: User;
+}
+
+export interface GuestOrderDraft {
+  table: string;
+  customerName?: string;
+  notes?: string;
+  items: OrderItem[];
 }
 
 export interface Profile {
@@ -54,6 +68,8 @@ export interface Order {
   status: OrderStatus;
   items: OrderItem[];
   notes?: string;
+  source?: 'guest';
+  customerName?: string;
 }
 
 export interface RestaurantTable {

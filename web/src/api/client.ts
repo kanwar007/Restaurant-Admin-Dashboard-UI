@@ -1,14 +1,34 @@
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api';
+const TOKEN_KEY = 'cafe-admin-token';
+
+export const tokenStore = {
+  read: () => localStorage.getItem(TOKEN_KEY),
+  write: (token: string) => localStorage.setItem(TOKEN_KEY, token),
+  clear: () => localStorage.removeItem(TOKEN_KEY),
+};
+
+const parseError = (detail: string, status: number) => {
+  try {
+    const parsed = JSON.parse(detail) as { error?: string };
+    if (parsed.error) return parsed.error;
+  } catch {
+    /* detail is not JSON */
+  }
+  return detail || `Request failed with status ${status}`;
+};
 
 const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
+  const token = tokenStore.read();
   const response = await fetch(`${BASE_URL}${path}`, {
     ...init,
-    headers: init?.body ? { 'Content-Type': 'application/json' } : undefined,
+    headers: {
+      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
   });
 
   if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(detail || `Request failed with status ${response.status}`);
+    throw new Error(parseError(await response.text(), response.status));
   }
 
   if (response.status === 204) return undefined as T;
