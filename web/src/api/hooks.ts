@@ -6,6 +6,7 @@ import type {
   Bill,
   BillFormat,
   Dashboard,
+  GuestOrderDraft,
   MenuItem,
   Order,
   OrderHistory,
@@ -124,6 +125,17 @@ export const useOrderHistory = (filters: { search?: string; status?: string }) =
     queryKey: ['order-history', filters],
     queryFn: () => api.get<OrderHistory>(`/order-history${buildQuery(filters)}`),
   });
+
+export const usePlaceGuestOrder = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (draft: GuestOrderDraft) => api.post<Order>('/guest/orders', draft),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
+    },
+  });
+};
 
 export const useBill = (orderNo: string, format: BillFormat) =>
   useQuery({

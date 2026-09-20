@@ -1,10 +1,37 @@
+import { randomUUID } from 'node:crypto';
+
 import { buildBill } from './bills.js';
-import { staticData, store } from './store.js';
+import { publicUser, staticData, store } from './store.js';
 
 const notFound = { status: 404, body: { error: 'Not found' } };
 const badRequest = (message) => ({ status: 400, body: { error: message } });
+const unauthorized = (message) => ({ status: 401, body: { error: message } });
 
 const matches = (haystack, needle) => haystack.toLowerCase().includes(needle.toLowerCase());
+
+const tokenFrom = (headers = {}) => (headers.authorization ?? '').replace(/^Bearer /i, '');
+
+const sessionUser = (headers) => {
+  const username = store.sessions.get(tokenFrom(headers));
+  const found = staticData.users.find((entry) => entry.username === username);
+  return found ? publicUser(found) : undefined;
+};
+
+const nextOrderNo = () => {
+  const highest = [...store.orders, ...store.orderHistory].reduce(
+    (max, entry) => Math.max(max, Number(entry.orderNo.replace('#', '')) || 0),
+    0,
+  );
+  return `#${String(highest + 1).padStart(3, '0')}`;
+};
+
+const clockNow = () => {
+  const now = new Date();
+  return {
+    time: now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
+    date: now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+  };
+};
 
 export const routes = [
   {
@@ -13,9 +40,43 @@ export const routes = [
     handle: () => ({ status: 200, body: { status: 'ok', uptime: process.uptime() } }),
   },
   {
+    method: 'POST',
+    path: /^\/api\/auth\/login$/,
+    handle: (_params, _query, body) => {
+      if (!body?.username || !body?.password) return badRequest('username and password are required');
+      const match = staticData.users.find(
+        (entry) => entry.username === body.username && entry.password === body.password,
+      );
+      if (!match) return unauthorized('Invalid username or password');
+      const token = randomUUID();
+      store.sessions.set(token, match.username);
+      return { status: 200, body: { token, user: publicUser(match) } };
+    },
+  },
+  {
+    method: 'GET',
+    path: /^\/api\/auth\/me$/,
+    handle: (_params, _query, _body, headers) => {
+      const found = sessionUser(headers);
+      if (!found) return unauthorized('Not signed in');
+      return { status: 200, body: { user: found } };
+    },
+  },
+  {
+    method: 'POST',
+    path: /^\/api\/auth\/logout$/,
+    handle: (_params, _query, _body, headers) => {
+      store.sessions.delete(tokenFrom(headers));
+      return { status: 200, body: { status: 'signed-out' } };
+    },
+  },
+  {
     method: 'GET',
     path: /^\/api\/profile$/,
-    handle: () => ({ status: 200, body: { restaurant: staticData.restaurant, user: staticData.user } }),
+    handle: (_params, _query, _body, headers) => ({
+      status: 200,
+      body: { restaurant: staticData.restaurant, user: sessionUser(headers) ?? staticData.user },
+    }),
   },
   {
     method: 'GET',
@@ -220,6 +281,49 @@ export const routes = [
       const bill = buildBill(decodeURIComponent(params[0]), format);
       if (!bill) return notFound;
       return { status: 200, body: bill };
+    },
+  },
+  {
+    method: 'POST',
+    path: /^\/api\/guest\/orders$/,
+    handle: (_params, _query, body) => {
+      if (!body?.table) return badRequest('table is required');
+      if (!Array.isArray(body?.items) || body.items.length === 0) {
+        return badRequest('items must be a non-empty array');
+      }
+      const items = body.items.map((item) => ({
+        name: item.name,
+        quantity: item.quantity ?? 1,
+        ...(item.addons?.length ? { addons: item.addons } : {}),
+      }));
+      const badQuantity = items.find((item) => !Number.isInteger(item.quantity) || item.quantity < 1);
+      if (badQuantity) return badRequest('quantity must be a positive whole number');
+
+      const unknown = items.find(
+        (item) => !store.menuItems.some((menuItem) => menuItem.name === item.name && menuItem.available),
+      );
+      if (unknown) return badRequest(`${unknown.name} is not on the menu right now`);
+
+      const order = {
+        id: store.nextId(store.orders),
+        orderNo: nextOrderNo(),
+        table: body.table,
+        status: 'new',
+        source: 'guest',
+        items,
+        ...clockNow(),
+        ...(body.notes ? { notes: body.notes } : {}),
+        ...(body.customerName ? { customerName: body.customerName } : {}),
+      };
+      store.orders.push(order);
+
+      const table = store.tables.find((entry) => entry.number === body.table);
+      if (table) {
+        table.status = 'occupied';
+        table.currentOrder = order.orderNo;
+      }
+
+      return { status: 201, body: order };
     },
   },
   {

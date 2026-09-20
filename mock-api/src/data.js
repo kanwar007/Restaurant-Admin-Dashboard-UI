@@ -13,6 +13,25 @@ export const user = {
   initials: 'AD',
 };
 
+export const users = [
+  {
+    id: '1',
+    username: 'admin',
+    password: 'admin123',
+    name: 'Admin User',
+    role: 'Manager',
+    initials: 'AD',
+  },
+  {
+    id: '2',
+    username: 'cashier',
+    password: 'cashier123',
+    name: 'Riya Sharma',
+    role: 'Cashier',
+    initials: 'RS',
+  },
+];
+
 export const categories = ['Coffee', 'Bakery', 'Salads', 'Sandwiches', 'Beverages'];
 
 export const menuItems = [

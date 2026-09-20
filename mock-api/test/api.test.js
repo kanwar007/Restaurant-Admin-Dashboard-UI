@@ -9,7 +9,10 @@ let server;
 const call = async (path, init) => {
   const response = await fetch(`${baseUrl}${path}`, {
     ...init,
-    headers: init?.body ? { 'Content-Type': 'application/json' } : undefined,
+    headers: {
+      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+      ...init?.headers,
+    },
   });
   const body = response.status === 204 ? null : await response.json();
   return { status: response.status, body };
@@ -97,6 +100,94 @@ describe('mock api', () => {
     assert.equal(body.status, 'vacant');
     assert.equal(body.currentOrder, undefined);
     await call('/api/reset', { method: 'POST' });
+  });
+
+  it('signs a user in, resolves the session, and signs out', async () => {
+    const login = await call('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ username: 'admin', password: 'admin123' }),
+    });
+    assert.equal(login.status, 200);
+    assert.equal(login.body.user.name, 'Admin User');
+    assert.equal(login.body.user.password, undefined);
+
+    const auth = { Authorization: `Bearer ${login.body.token}` };
+    const me = await call('/api/auth/me', { headers: auth });
+    assert.equal(me.body.user.username, 'admin');
+
+    const profile = await call('/api/profile', { headers: auth });
+    assert.equal(profile.body.user.name, 'Admin User');
+
+    await call('/api/auth/logout', { method: 'POST', headers: auth });
+    const afterLogout = await call('/api/auth/me', { headers: auth });
+    assert.equal(afterLogout.status, 401);
+  });
+
+  it('rejects bad credentials and unknown sessions', async () => {
+    const badPassword = await call('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ username: 'admin', password: 'nope' }),
+    });
+    assert.equal(badPassword.status, 401);
+
+    const missingFields = await call('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ username: 'admin' }),
+    });
+    assert.equal(missingFields.status, 400);
+
+    const noSession = await call('/api/auth/me', { headers: { Authorization: 'Bearer nope' } });
+    assert.equal(noSession.status, 401);
+  });
+
+  it('accepts a guest order without a session and seats the table', async () => {
+    const created = await call('/api/guest/orders', {
+      method: 'POST',
+      body: JSON.stringify({
+        table: 'T-02',
+        customerName: 'Vijay',
+        items: [{ name: 'Latte', quantity: 2, addons: ['Extra Shot'] }],
+      }),
+    });
+    assert.equal(created.status, 201);
+    assert.equal(created.body.source, 'guest');
+    assert.equal(created.body.status, 'new');
+    assert.equal(created.body.items[0].quantity, 2);
+
+    const tables = await call('/api/tables');
+    const seated = tables.body.find((table) => table.number === 'T-02');
+    assert.equal(seated.status, 'occupied');
+    assert.equal(seated.currentOrder, created.body.orderNo);
+
+    const orders = await call('/api/orders');
+    assert.ok(orders.body.some((order) => order.orderNo === created.body.orderNo));
+    await call('/api/reset', { method: 'POST' });
+  });
+
+  it('validates guest orders', async () => {
+    const noTable = await call('/api/guest/orders', {
+      method: 'POST',
+      body: JSON.stringify({ items: [{ name: 'Latte', quantity: 1 }] }),
+    });
+    assert.equal(noTable.status, 400);
+
+    const noItems = await call('/api/guest/orders', {
+      method: 'POST',
+      body: JSON.stringify({ table: 'T-02', items: [] }),
+    });
+    assert.equal(noItems.status, 400);
+
+    const unavailable = await call('/api/guest/orders', {
+      method: 'POST',
+      body: JSON.stringify({ table: 'T-02', items: [{ name: 'Blueberry Muffin', quantity: 1 }] }),
+    });
+    assert.equal(unavailable.status, 400);
+
+    const badQuantity = await call('/api/guest/orders', {
+      method: 'POST',
+      body: JSON.stringify({ table: 'T-02', items: [{ name: 'Latte', quantity: 0 }] }),
+    });
+    assert.equal(badQuantity.status, 400);
   });
 
   it('404s unknown endpoints', async () => {

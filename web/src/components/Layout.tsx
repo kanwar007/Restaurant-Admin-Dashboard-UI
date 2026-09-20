@@ -4,13 +4,15 @@ import {
   History,
   LayoutDashboard,
   ListPlus,
+  LogOut,
   ShoppingCart,
   Table2,
   UtensilsCrossed,
 } from 'lucide-react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 
 import { useProfile } from '../api/hooks';
+import { useAuth } from '../auth/useAuth';
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -24,6 +26,13 @@ const navItems = [
 
 export const Layout = () => {
   const { data: profile } = useProfile();
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/login', { replace: true });
+  };
 
   return (
     <div className="app-shell">
@@ -46,12 +55,15 @@ export const Layout = () => {
             <span className="badge-dot" />
           </button>
           <div className="user-chip">
-            <div className="avatar">{profile?.user.initials ?? 'AD'}</div>
+            <div className="avatar">{user?.initials ?? profile?.user.initials ?? 'AD'}</div>
             <div>
-              <div className="user-name">{profile?.user.name ?? 'Admin User'}</div>
-              <div className="user-role">{profile?.user.role ?? 'Manager'}</div>
+              <div className="user-name">{user?.name ?? profile?.user.name ?? 'Admin User'}</div>
+              <div className="user-role">{user?.role ?? profile?.user.role ?? 'Manager'}</div>
             </div>
           </div>
+          <button className="icon-button" type="button" aria-label="Sign out" onClick={handleSignOut}>
+            <LogOut size={19} />
+          </button>
         </div>
       </header>
 

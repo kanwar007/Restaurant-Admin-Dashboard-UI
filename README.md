@@ -3,8 +3,11 @@
 Café Admin — a React restaurant management dashboard built to the Figma "Restaurant Admin Dashboard UI"
 design, backed by a dependency-free mock API and packaged for Azure Kubernetes Service.
 
-Screens: Dashboard Overview, Menu Management, Order Rail, Table Management, Addon Management,
-Billing & Printing (KOT / Customer / CA / Restaurant copy), Order History.
+Staff screens (sign-in required): Dashboard Overview, Menu Management, Order Rail, Table Management,
+Addon Management, Billing & Printing (KOT / Customer / CA / Restaurant copy), Order History.
+
+Public screens: `/login` for staff and `/guest`, where a customer browses the menu and places an order
+from their table without signing in.
 
 ```
 web/        React 19 + TypeScript + Vite SPA (nginx image)
@@ -47,10 +50,19 @@ Prerequisite: Node.js >= 20 (`node -v`). npm ships with Node.
    npm run dev      # http://localhost:5173
    ```
 
-5. Open http://localhost:5173. Vite proxies `/api` to `http://127.0.0.1:4000`, so the dashboard loads
+5. Sign in at http://localhost:5173/login with a demo account (mock credentials, no real auth):
+
+   | Username | Password | Role |
+   | --- | --- | --- |
+   | `admin` | `admin123` | Manager |
+   | `cashier` | `cashier123` | Cashier |
+
+   Customers can skip the login entirely and order from http://localhost:5173/guest.
+
+6. Open http://localhost:5173. Vite proxies `/api` to `http://127.0.0.1:4000`, so the dashboard loads
    live mock data. Verify the API directly with `curl http://127.0.0.1:4000/api/health`.
 
-6. Reset the data at any time (mutations are in-memory)
+7. Reset the data at any time (mutations are in-memory)
 
    ```bash
    curl -X POST http://localhost:4000/api/reset
@@ -81,6 +93,10 @@ Troubleshooting:
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
 | GET | `/api/health` | Liveness/readiness probe |
+| POST | `/api/auth/login` | Exchange username/password for a bearer token |
+| GET | `/api/auth/me` | Resolve the signed-in user from the bearer token |
+| POST | `/api/auth/logout` | Drop the session |
+| POST | `/api/guest/orders` | Place a guest order — no token required |
 | GET | `/api/profile` | Restaurant + signed-in user |
 | GET | `/api/dashboard` | Stat cards and latest orders |
 | GET | `/api/menu?category=&search=` | Menu items |
@@ -95,7 +111,9 @@ Troubleshooting:
 | GET | `/api/bills/:orderNo?format=kot\|customer\|ca\|restaurant` | Rendered bill with GST split |
 | POST | `/api/reset` | Restore the seeded dataset |
 
-State is in-memory, so mutations survive until the pod restarts or `/api/reset` is called.
+State is in-memory, so mutations survive until the pod restarts or `/api/reset` is called. Auth is a mock:
+credentials are seeded in plain text and tokens are random UUIDs kept in memory — do not use it as-is in
+production.
 
 ## Docker
 

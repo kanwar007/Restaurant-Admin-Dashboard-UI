@@ -8,6 +8,7 @@ import {
   restaurant,
   tables,
   user,
+  users,
 } from './data.js';
 
 const clone = (value) => structuredClone(value);
@@ -18,6 +19,7 @@ const createState = () => ({
   orders: clone(orders),
   tables: clone(tables),
   orderHistory: clone(orderHistory),
+  sessions: new Map(),
 });
 
 let state = createState();
@@ -41,12 +43,17 @@ export const store = {
   get orderHistory() {
     return state.orderHistory;
   },
+  get sessions() {
+    return state.sessions;
+  },
   nextId(collection) {
     return String(collection.reduce((max, entry) => Math.max(max, Number(entry.id) || 0), 0) + 1);
   },
 };
 
-export const staticData = { restaurant, user, categories, dashboard };
+export const staticData = { restaurant, user, users, categories, dashboard };
+
+export const publicUser = ({ password: _password, ...rest }) => rest;
 
 export const priceFor = (dishName) =>
   state.menuItems.find((item) => item.name === dishName)?.price ?? 0;

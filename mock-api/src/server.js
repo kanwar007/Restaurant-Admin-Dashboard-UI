@@ -9,7 +9,7 @@ const LATENCY_MS = Number(process.env.MOCK_LATENCY_MS ?? 120);
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET,POST,PATCH,DELETE,OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type,Authorization',
 };
 
 const readBody = async (req) => {
@@ -63,7 +63,7 @@ export const createApp = () =>
     if (LATENCY_MS > 0 && url.pathname !== '/api/health') await delay(LATENCY_MS);
 
     const params = url.pathname.match(route.path)?.slice(1) ?? [];
-    const result = route.handle(params, url.searchParams, body);
+    const result = route.handle(params, url.searchParams, body, req.headers);
     send(res, result.status, result.body);
   });
 
