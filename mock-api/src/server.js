@@ -1,4 +1,6 @@
 import { createServer } from 'node:http';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { routes } from './routes.js';
 
@@ -67,7 +69,7 @@ export const createApp = () =>
     send(res, result.status, result.body);
   });
 
-const isEntrypoint = import.meta.url === `file://${process.argv[1]}`;
+const isEntrypoint = process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1]);
 
 if (isEntrypoint) {
   createApp().listen(PORT, HOST, () => {

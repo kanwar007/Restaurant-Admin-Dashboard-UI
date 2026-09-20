@@ -1,0 +1,869 @@
+openapi: 3.1.0
+info:
+  title: Cafe Admin Mock API
+  version: 1.0.0
+  description: In-memory mock API used by the Restaurant Admin Dashboard UI.
+  license:
+    name: UNLICENSED
+servers:
+  - url: http://127.0.0.1:4000
+    description: Local mock API
+  - url: http://localhost:4000
+    description: Local mock API (localhost)
+security: []
+tags:
+  - name: Health
+    description: Service liveness checks.
+  - name: Authentication
+    description: Staff sign-in and session management.
+  - name: Dashboard
+    description: Restaurant profile and dashboard data.
+  - name: Menu
+    description: Menu categories and dishes.
+  - name: Add-ons
+    description: Optional dish add-ons.
+  - name: Orders
+    description: Active orders and order history.
+  - name: Tables
+    description: Restaurant table management.
+  - name: Billing
+    description: KOT and customer bill rendering.
+  - name: Guest
+    description: Guest ordering without authentication.
+  - name: Administration
+    description: In-memory development data controls.
+paths:
+  /api/health:
+    get:
+      tags: [Health]
+      summary: Check API health
+      operationId: getHealth
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+  /api/auth/login:
+    post:
+      tags: [Authentication]
+      summary: Sign in a staff user
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Signed-in user and bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/auth/me:
+    get:
+      tags: [Authentication]
+      summary: Get the current signed-in user
+      operationId: getCurrentUser
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [user]
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Sign out the current session
+      operationId: logout
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Session was removed
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    const: signed-out
+  /api/profile:
+    get:
+      tags: [Dashboard]
+      summary: Get restaurant and user profile data
+      operationId: getProfile
+      security:
+        - bearerAuth: []
+        - {}
+      responses:
+        '200':
+          description: Restaurant profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+  /api/dashboard:
+    get:
+      tags: [Dashboard]
+      summary: Get dashboard statistics and latest orders
+      operationId: getDashboard
+      security:
+        - bearerAuth: []
+        - {}
+      responses:
+        '200':
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dashboard'
+  /api/menu/categories:
+    get:
+      tags: [Menu]
+      summary: List menu categories
+      operationId: listMenuCategories
+      responses:
+        '200':
+          description: Menu category names
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+  /api/menu:
+    get:
+      tags: [Menu]
+      summary: List menu items
+      operationId: listMenu
+      parameters:
+        - $ref: '#/components/parameters/Category'
+        - $ref: '#/components/parameters/Search'
+      responses:
+        '200':
+          description: Matching menu items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MenuItem'
+    post:
+      tags: [Menu]
+      summary: Create a menu item
+      operationId: createMenuItem
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MenuItemInput'
+      responses:
+        '201':
+          description: Created menu item
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MenuItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /api/menu/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Menu]
+      summary: Update a menu item
+      operationId: updateMenuItem
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MenuItemPatch'
+      responses:
+        '200':
+          description: Updated menu item
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MenuItem'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Menu]
+      summary: Delete a menu item
+      operationId: deleteMenuItem
+      responses:
+        '204':
+          description: Menu item deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/addons:
+    get:
+      tags: [Add-ons]
+      summary: List add-ons
+      operationId: listAddons
+      parameters:
+        - $ref: '#/components/parameters/Search'
+      responses:
+        '200':
+          description: Matching add-ons
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Addon'
+    post:
+      tags: [Add-ons]
+      summary: Create an add-on
+      operationId: createAddon
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddonInput'
+      responses:
+        '201':
+          description: Created add-on
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Addon'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /api/addons/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Add-ons]
+      summary: Update an add-on
+      operationId: updateAddon
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddonPatch'
+      responses:
+        '200':
+          description: Updated add-on
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Addon'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Add-ons]
+      summary: Delete an add-on
+      operationId: deleteAddon
+      responses:
+        '204':
+          description: Add-on deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/orders:
+    get:
+      tags: [Orders]
+      summary: List active orders
+      operationId: listOrders
+      responses:
+        '200':
+          description: Active orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+  /api/orders/{id}/status:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Orders]
+      summary: Change an order status
+      operationId: updateOrderStatus
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [new, kot-printed, served]
+      responses:
+        '200':
+          description: Updated order
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/orders/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    delete:
+      tags: [Orders]
+      summary: Cancel an active order
+      operationId: deleteOrder
+      responses:
+        '204':
+          description: Order deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/tables:
+    get:
+      tags: [Tables]
+      summary: List tables
+      operationId: listTables
+      responses:
+        '200':
+          description: Tables
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Table'
+    post:
+      tags: [Tables]
+      summary: Create a table
+      operationId: createTable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [capacity]
+              properties:
+                number:
+                  type: string
+                capacity:
+                  type: integer
+                  minimum: 1
+      responses:
+        '201':
+          description: Created table
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Table'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /api/tables/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Tables]
+      summary: Update a table
+      operationId: updateTable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TablePatch'
+      responses:
+        '200':
+          description: Updated table
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Table'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/order-history:
+    get:
+      tags: [Orders]
+      summary: Search order history
+      operationId: listOrderHistory
+      parameters:
+        - $ref: '#/components/parameters/Search'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [all, completed, cancelled]
+      responses:
+        '200':
+          description: Historical orders and summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderHistoryResponse'
+  /api/bills/{orderNo}:
+    parameters:
+      - name: orderNo
+        in: path
+        required: true
+        description: Order number, for example #001. URL-encode the hash character.
+        schema:
+          type: string
+          example: '#001'
+    get:
+      tags: [Billing]
+      summary: Render an order bill
+      operationId: getBill
+      parameters:
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [kot, customer, ca, restaurant]
+            default: kot
+      responses:
+        '200':
+          description: Rendered bill
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bill'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/guest/orders:
+    post:
+      tags: [Guest]
+      summary: Place an order as a guest
+      operationId: createGuestOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GuestOrderRequest'
+      responses:
+        '201':
+          description: Created guest order
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /api/reset:
+    post:
+      tags: [Administration]
+      summary: Reset in-memory data
+      operationId: resetData
+      responses:
+        '200':
+          description: Data reset completed
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    const: reset
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: UUID
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    Search:
+      name: search
+      in: query
+      schema:
+        type: string
+    Category:
+      name: category
+      in: query
+      schema:
+        type: string
+        description: Use All or omit this parameter to return every category.
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Missing or invalid credentials
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+    Health:
+      type: object
+      required: [status, uptime]
+      properties:
+        status:
+          type: string
+          const: ok
+        uptime:
+          type: number
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          example: admin
+        password:
+          type: string
+          format: password
+          example: admin123
+    LoginResponse:
+      type: object
+      required: [token, user]
+      properties:
+        token:
+          type: string
+          format: uuid
+        user:
+          $ref: '#/components/schemas/User'
+    User:
+      type: object
+      required: [id, username, name, role, initials]
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+        initials:
+          type: string
+    Restaurant:
+      type: object
+      required: [name, tagline, gstin, address, phone, gstRate]
+      properties:
+        name:
+          type: string
+        tagline:
+          type: string
+        gstin:
+          type: string
+        address:
+          type: string
+        phone:
+          type: string
+        gstRate:
+          type: number
+    Profile:
+      type: object
+      required: [restaurant, user]
+      properties:
+        restaurant:
+          $ref: '#/components/schemas/Restaurant'
+        user:
+          $ref: '#/components/schemas/User'
+    MenuItem:
+      type: object
+      required: [id, name, category, price, available, addons]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        category:
+          type: string
+        price:
+          type: number
+        available:
+          type: boolean
+        addons:
+          type: integer
+          minimum: 0
+    MenuItemInput:
+      type: object
+      required: [name, category, price]
+      properties:
+        name:
+          type: string
+        category:
+          type: string
+        price:
+          type: number
+        available:
+          type: boolean
+          default: true
+        addons:
+          type: integer
+          minimum: 0
+    MenuItemPatch:
+      allOf:
+        - $ref: '#/components/schemas/MenuItemInput'
+      required: []
+    Addon:
+      type: object
+      required: [id, name, price, linkedDishes]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        price:
+          type: number
+        linkedDishes:
+          type: array
+          items:
+            type: string
+    AddonInput:
+      type: object
+      required: [name, price]
+      properties:
+        name:
+          type: string
+        price:
+          type: number
+        linkedDishes:
+          type: array
+          items:
+            type: string
+    AddonPatch:
+      $ref: '#/components/schemas/AddonInput'
+    OrderItem:
+      type: object
+      required: [name, quantity]
+      properties:
+        name:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+        addons:
+          type: array
+          items:
+            type: string
+    Order:
+      type: object
+      required: [id, orderNo, table, status, items]
+      properties:
+        id:
+          type: string
+        orderNo:
+          type: string
+        table:
+          type: string
+        time:
+          type: string
+        date:
+          type: string
+        status:
+          type: string
+          enum: [new, kot-printed, served]
+        source:
+          type: string
+          enum: [guest]
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        notes:
+          type: string
+        customerName:
+          type: string
+    Table:
+      type: object
+      required: [id, number, capacity, status]
+      properties:
+        id:
+          type: string
+        number:
+          type: string
+        capacity:
+          type: integer
+          minimum: 1
+        status:
+          type: string
+          enum: [vacant, occupied, reserved, bill-pending]
+        currentOrder:
+          type: string
+    TablePatch:
+      type: object
+      properties:
+        number:
+          type: string
+        capacity:
+          type: integer
+          minimum: 1
+        status:
+          type: string
+          enum: [vacant, occupied, reserved, bill-pending]
+    Dashboard:
+      type: object
+      additionalProperties: true
+      properties:
+        businessDate:
+          type: string
+        businessTime:
+          type: string
+        stats:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        latestOrders:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+    OrderHistoryResponse:
+      type: object
+      required: [rows, summary]
+      properties:
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderHistoryRow'
+        summary:
+          type: object
+          required: [totalOrders, completed, cancelled, totalRevenue]
+          properties:
+            totalOrders:
+              type: integer
+            completed:
+              type: integer
+            cancelled:
+              type: integer
+            totalRevenue:
+              type: number
+    OrderHistoryRow:
+      type: object
+      additionalProperties: true
+      required: [id, orderNo, table, date, time, status, totalAmount, paymentMode, items]
+      properties:
+        id:
+          type: string
+        orderNo:
+          type: string
+        table:
+          type: string
+        date:
+          type: string
+        time:
+          type: string
+        status:
+          type: string
+          enum: [completed, cancelled]
+        totalAmount:
+          type: number
+        paymentMode:
+          type: string
+        items:
+          type: integer
+    Bill:
+      type: object
+      required: [format, orderNo, table, date, time, lines, restaurant, title, showPricing]
+      properties:
+        format:
+          type: string
+          enum: [kot, customer, ca, restaurant]
+        orderNo:
+          type: string
+        table:
+          type: string
+        date:
+          type: string
+        time:
+          type: string
+        notes:
+          type: [string, 'null']
+        lines:
+          type: array
+          items:
+            type: object
+            required: [name, quantity, addons, unitPrice, amount]
+            properties:
+              name:
+                type: string
+              quantity:
+                type: integer
+              addons:
+                type: array
+                items:
+                  type: string
+              unitPrice:
+                type: number
+              amount:
+                type: number
+        restaurant:
+          type: object
+          additionalProperties: true
+        title:
+          type: string
+        showPricing:
+          type: boolean
+        totals:
+          type: object
+          additionalProperties: true
+        settlement:
+          type: object
+          additionalProperties: true
+        footer:
+          type: string
+    GuestOrderRequest:
+      type: object
+      required: [table, items]
+      properties:
+        table:
+          type: string
+          example: T-05
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        notes:
+          type: string
+        customerName:
+          type: string

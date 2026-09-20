@@ -1,1 +1,1 @@
-export const formatCurrency = (value: number) => `₹${value.toLocaleString('en-IN')}`;
+export const formatCurrency = (value: number) => `$${value.toLocaleString('en-AUD')}`;
