@@ -810,6 +810,17 @@ tbody td {
   box-shadow: var(--shadow);
 }
 
+.table-actions {
+  flex-wrap: wrap;
+  margin-top: auto;
+}
+
+.table-actions .btn {
+  flex: 1 1 110px;
+  min-width: 0;
+  padding-inline: 14px;
+}
+
 .table-number {
   margin: 0;
   font-size: 24px;

@@ -74,8 +74,8 @@ export const TablesPage = () => {
                   </div>
                 ) : null}
 
-                <div className="row">
-                  <button className="btn btn-outline" type="button" style={{ flex: 1 }}>
+                <div className="row table-actions">
+                  <button className="btn btn-outline" type="button">
                     <QrCode size={16} />
                     QR Code
                   </button>
