@@ -1,0 +1,60 @@
+name: Deploy to AKS
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Image tag to build and deploy
+        required: true
+        default: latest
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Build images and roll out
+    runs-on: ubuntu-latest
+    environment: aks
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Build images in ACR
+        run: |
+          az acr build -r "$ACR" -t "cafe-admin-web:$TAG" ./web
+          az acr build -r "$ACR" -t "cafe-admin-mock-api:$TAG" ./mock-api
+        env:
+          ACR: ${{ vars.ACR_NAME }}
+          TAG: ${{ inputs.image_tag }}
+
+      - uses: azure/aks-set-context@v4
+        with:
+          resource-group: ${{ vars.AKS_RESOURCE_GROUP }}
+          cluster-name: ${{ vars.AKS_CLUSTER_NAME }}
+
+      - uses: azure/setup-kubectl@v4
+        with:
+          version: v1.31.0
+
+      - name: Apply manifests
+        run: |
+          cd deploy/k8s
+          kubectl kustomize . \
+            | sed "s#ACRNAME.azurecr.io/cafe-admin-web:latest#$ACR.azurecr.io/cafe-admin-web:$TAG#; \
+                   s#ACRNAME.azurecr.io/cafe-admin-mock-api:latest#$ACR.azurecr.io/cafe-admin-mock-api:$TAG#" \
+            | kubectl apply -f -
+        env:
+          ACR: ${{ vars.ACR_NAME }}
+          TAG: ${{ inputs.image_tag }}
+
+      - name: Wait for rollout
+        run: |
+          kubectl -n cafe-admin rollout status deployment/cafe-admin-mock-api --timeout=180s
+          kubectl -n cafe-admin rollout status deployment/cafe-admin-web --timeout=180s
