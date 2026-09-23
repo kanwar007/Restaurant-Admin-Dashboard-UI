@@ -146,3 +146,17 @@ kubectl -n cafe-admin get ingress cafe-admin
 The Ingress uses the AKS managed ingress controller (`webapprouting.kubernetes.azure.com`); enable it with
 `az aks approuting enable -g $RG -n $AKS`, or swap `ingressClassName` for your own controller. The web pod
 proxies `/api` to the `cafe-admin-mock-api` Service, so only the web Service needs to be exposed.
+
+## GitHub Actions
+
+`.github/workflows/ci.yml` runs on every pull request and push to `main`: web lint + production build,
+mock-API tests, both Docker image builds, and a `kubectl kustomize` render of the AKS manifests.
+
+`.github/workflows/deploy-aks.yml` is manual (`workflow_dispatch`, input `image_tag`). It builds both images
+with `az acr build`, points the manifests at that tag, applies them, and waits for both rollouts. It needs an
+`aks` environment with:
+
+| Kind | Name |
+| --- | --- |
+| Secret | `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` (OIDC federated credential) |
+| Variable | `ACR_NAME`, `AKS_RESOURCE_GROUP`, `AKS_CLUSTER_NAME` |
