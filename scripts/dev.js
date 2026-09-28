@@ -6,8 +6,14 @@ import { dirname, join } from 'node:path';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
+// API_URL points the Vite proxy at an already-running backend, so the mock is not started.
+const useMock = !process.env.API_URL;
+if (!useMock) console.log(`Proxying /api to ${process.env.API_URL} — mock API not started.`);
+
 const children = [
-  spawn(npm, ['start'], { cwd: join(root, 'mock-api'), stdio: 'inherit', shell: process.platform === 'win32' }),
+  ...(useMock
+    ? [spawn(npm, ['start'], { cwd: join(root, 'mock-api'), stdio: 'inherit', shell: process.platform === 'win32' })]
+    : []),
   spawn(npm, ['run', 'dev'], { cwd: join(root, 'web'), stdio: 'inherit', shell: process.platform === 'win32' }),
 ];
 

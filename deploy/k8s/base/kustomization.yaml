@@ -5,7 +5,6 @@ namespace: cafe-admin
 
 resources:
   - namespace.yaml
-  - mock-api.yaml
   - web.yaml
   - hpa.yaml
 
@@ -13,6 +12,4 @@ resources:
 #   kustomize edit set image ACRNAME.azurecr.io/cafe-admin-web=myacr.azurecr.io/cafe-admin-web:v1
 images:
   - name: ACRNAME.azurecr.io/cafe-admin-web
-    newTag: latest
-  - name: ACRNAME.azurecr.io/cafe-admin-mock-api
     newTag: latest

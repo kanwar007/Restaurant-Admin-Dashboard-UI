@@ -1,7 +1,9 @@
 # Restaurant Admin Dashboard UI
 
 Café Admin — a React restaurant management dashboard built to the Figma "Restaurant Admin Dashboard UI"
-design, backed by a dependency-free mock API and packaged for Azure Kubernetes Service.
+design, talking to the [Spring Boot backend](https://github.com/kanwar007/Restaurant-Admin-Dashboard-BackEnd)
+and packaged for Azure Kubernetes Service. A dependency-free mock API implementing the same contract is
+kept for offline UI work.
 
 Staff screens (sign-in required): Dashboard Overview, Menu Management, Order Rail, Table Management,
 Addon Management, Billing & Printing (KOT / Customer / CA / Restaurant copy), Order History.
@@ -10,10 +12,14 @@ Public screens: `/login` for staff and `/guest`, where a customer browses the me
 from their table without signing in.
 
 ```
-web/        React 19 + TypeScript + Vite SPA (nginx image)
-mock-api/   Node http mock API, no runtime dependencies
-deploy/k8s/ Kubernetes manifests (Deployments, Services, Ingress, HPAs)
+web/                     React 19 + TypeScript + Vite SPA (nginx image)
+mock-api/                Node http mock API implementing the same contract, no runtime dependencies
+deploy/k8s/base/         Kubernetes manifests for the SPA (proxies /api to the backend gateway)
+deploy/k8s/overlays/mock Same SPA, but pointed at the mock API deployed alongside it
 ```
+
+The SPA itself is backend-agnostic: it always calls relative `/api/...`, and Vite (dev) or nginx (image)
+proxies that to whatever `API_URL` / `API_UPSTREAM` points at.
 
 ## Run locally
 
@@ -26,14 +32,20 @@ Prerequisite: Node.js >= 20 (`node -v`). npm ships with Node.
    cd Restaurant-Admin-Dashboard-UI
    ```
 
-2. Install frontend dependencies and start both processes with one command
+2. Install frontend dependencies, then start the UI
 
    ```bash
    npm run install:all
+
+   # against the real backend (run `docker compose up -d --build` in the backend repo first)
+   API_URL=http://127.0.0.1:4000 npm run dev
+
+   # or fully offline, against the bundled mock
    npm run dev      # mock API on :4000 + Vite on :5173
    ```
 
-   Then open http://localhost:5173 and skip to step 5. To run them separately instead, use steps 3-4.
+   Setting `API_URL` skips starting the mock and just points the Vite proxy at the running gateway.
+   Then open http://localhost:5173 and skip to step 5. To run the mock separately instead, use steps 3-4.
 
 3. Start the mock API (terminal 1) — no dependencies to install
 
@@ -59,8 +71,8 @@ Prerequisite: Node.js >= 20 (`node -v`). npm ships with Node.
 
    Customers can skip the login entirely and order from http://localhost:5173/guest.
 
-6. Open http://localhost:5173. Vite proxies `/api` to `http://127.0.0.1:4000`, so the dashboard loads
-   live mock data. Verify the API directly with `curl http://127.0.0.1:4000/api/health`.
+6. Open http://localhost:5173. Vite proxies `/api` to the upstream on `:4000`, so the dashboard loads live
+   data. Verify the API directly with `curl http://127.0.0.1:4000/api/health`.
 
 7. Reset the data at any time (mutations are in-memory)
 
@@ -83,12 +95,15 @@ Troubleshooting:
 
 - `[vite] http proxy error: /api/... ECONNREFUSED`: the mock API is not running on port 4000. Start it
   (`cd mock-api && npm start`) or use `npm run dev` from the repo root, which starts both.
-- Port already in use: `PORT=4100 npm start` in `mock-api`, then `MOCK_API_URL=http://127.0.0.1:4100 npm run dev` in `web`.
+- Port already in use: `PORT=4100 npm start` in `mock-api`, then `API_URL=http://127.0.0.1:4100 npm run dev` in `web`.
 
 `MOCK_LATENCY_MS` (default `120`) adds artificial latency to every mock endpoint except `/api/health`.
 `VITE_API_BASE_URL` overrides the API base path (default `/api`).
 
-## Mock API
+## API contract
+
+The backend's `docs/openapi.yaml` and `mock-api/openapi.yaml` describe the same 25 operations and the
+same schemas, so switching between them needs no frontend change.
 
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
@@ -111,17 +126,28 @@ Troubleshooting:
 | GET | `/api/bills/:orderNo?format=kot\|customer\|ca\|restaurant` | Rendered bill with GST split |
 | POST | `/api/reset` | Restore the seeded dataset |
 
-State is in-memory, so mutations survive until the pod restarts or `/api/reset` is called. Auth is a mock:
-credentials are seeded in plain text and tokens are random UUIDs kept in memory — do not use it as-is in
-production.
+Mock state is in-memory, so mutations survive until the pod restarts or `/api/reset` is called. Mock auth
+seeds credentials in plain text and keeps random-UUID tokens in memory — use the real backend for anything
+beyond UI work.
 
 ## Docker
 
 ```bash
-docker compose up --build    # web on :8080, mock API on :4000
+# real backend: start it first (docker compose up -d --build in the backend repo)
+docker compose up --build                                                    # web on :8080
+
+# offline: mock API in the same compose project
+API_UPSTREAM=http://mock-api:4000 docker compose --profile mock up --build   # web :8080, mock :4000
 ```
 
+`API_UPSTREAM` defaults to `http://host.docker.internal:4000`, i.e. the backend gateway published on the
+host.
+
 ## Deploy to AKS
+
+Deploy the [backend](https://github.com/kanwar007/Restaurant-Admin-Dashboard-BackEnd) into the same
+`cafe-admin` namespace first (`kubectl apply -k deploy/k8s/overlays/aks` in that repo); the web pod proxies
+`/api` to its `api-gateway` Service, so only the web Service is exposed.
 
 ```bash
 ACR=myacr
@@ -129,32 +155,31 @@ RG=my-resource-group
 AKS=my-aks-cluster
 
 az acr build -r $ACR -t cafe-admin-web:v1 ./web
-az acr build -r $ACR -t cafe-admin-mock-api:v1 ./mock-api
 
 az aks update -g $RG -n $AKS --attach-acr $ACR
 az aks get-credentials -g $RG -n $AKS
 
-cd deploy/k8s
-kustomize edit set image \
-  ACRNAME.azurecr.io/cafe-admin-web=$ACR.azurecr.io/cafe-admin-web:v1 \
-  ACRNAME.azurecr.io/cafe-admin-mock-api=$ACR.azurecr.io/cafe-admin-mock-api:v1
+cd deploy/k8s/base
+kustomize edit set image ACRNAME.azurecr.io/cafe-admin-web=$ACR.azurecr.io/cafe-admin-web:v1
 kubectl apply -k .
 
 kubectl -n cafe-admin get ingress cafe-admin
 ```
 
+For a backend-free demo, build `./mock-api` too and apply `deploy/k8s/overlays/mock`, which deploys the
+mock and repoints `API_UPSTREAM` at it.
+
 The Ingress uses the AKS managed ingress controller (`webapprouting.kubernetes.azure.com`); enable it with
-`az aks approuting enable -g $RG -n $AKS`, or swap `ingressClassName` for your own controller. The web pod
-proxies `/api` to the `cafe-admin-mock-api` Service, so only the web Service needs to be exposed.
+`az aks approuting enable -g $RG -n $AKS`, or swap `ingressClassName` for your own controller.
 
 ## GitHub Actions
 
 `.github/workflows/ci.yml` runs on every pull request and push to `main`: web lint + production build,
-mock-API tests, both Docker image builds, and a `kubectl kustomize` render of the AKS manifests.
+mock-API tests, both Docker image builds, and a `kubectl kustomize` render of both manifest variants.
 
-`.github/workflows/deploy-aks.yml` is manual (`workflow_dispatch`, input `image_tag`). It builds both images
-with `az acr build`, points the manifests at that tag, applies them, and waits for both rollouts. It needs an
-`aks` environment with:
+`.github/workflows/deploy-aks.yml` is manual (`workflow_dispatch`, inputs `image_tag` and `overlay`). It
+builds the web image (plus the mock image when the mock overlay is selected) with `az acr build`, points the
+manifests at that tag, applies them, and waits for the rollouts. It needs an `aks` environment with:
 
 | Kind | Name |
 | --- | --- |

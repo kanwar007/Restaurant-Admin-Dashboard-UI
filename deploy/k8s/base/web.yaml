@@ -26,8 +26,9 @@ spec:
             - name: http
               containerPort: 8080
           env:
-            - name: MOCK_API_UPSTREAM
-              value: http://cafe-admin-mock-api:4000
+            # api-gateway Service from Restaurant-Admin-Dashboard-BackEnd, deployed in this namespace.
+            - name: API_UPSTREAM
+              value: http://api-gateway:8080
           resources:
             requests:
               cpu: 25m
