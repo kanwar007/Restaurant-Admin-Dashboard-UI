@@ -63,6 +63,21 @@ Inputs whose `value` comes from state and whose `onChange` updates that state ar
 
 When state is based on its previous value, the app uses the functional setter form, for example `setCart((current) => ...)` in `GuestPage`. This ensures each update is calculated from the latest state.
 
+### How State Flows Through the Application
+
+State is kept close to the code that owns it, unless multiple screens need to share it:
+
+1. **An interaction happens.** A user types, selects an option, or presses a button. An event handler calls a React state setter or starts an API mutation.
+2. **The owning state changes.** Local state stays in its page or component. Authentication state is shared through `AuthContext`. API data is managed and cached by TanStack Query.
+3. **React renders with the new value.** Components consuming that state or query data run again and return updated JSX. React updates the affected UI.
+4. **Related API data stays in sync.** When a mutation succeeds, its hook invalidates the relevant query keys. TanStack Query refreshes those queries, and subscribed pages render the updated response.
+
+For sign-in, `LoginPage` calls `signIn` from `useAuth`. `AuthProvider` sends the credentials, saves the returned token, and updates the user and status in context. Components such as `RequireAuth` and `Layout` consume that shared state, so the staff routes and user details update accordingly.
+
+For a guest order, `GuestPage` updates its local cart as the customer changes quantities and add-ons. Submitting the cart invokes the `usePlaceGuestOrder` mutation. After the API accepts it, the page shows the confirmation and clears the cart; the mutation also invalidates the `orders` and `tables` queries so staff views can load the new server data.
+
+In short, the app does not keep one giant global state object. It uses component state for temporary interaction details, context for shared authentication, and query caching for data whose source of truth is the API.
+
 ## Effects and Context
 
 ### `useEffect`
@@ -74,6 +89,18 @@ When state is based on its previous value, the app uses the functional setter fo
 React Context shares a value with components below a provider without passing it through every intermediate component as props. [`AuthContext`](../web/src/auth/context.ts) defines the authentication value, and `AuthProvider` supplies it. [`useAuth`](../web/src/auth/useAuth.ts) is a small custom hook that reads the context and reports a clear error if used outside the provider.
 
 The authentication context includes the user, authentication status, `signIn`, and `signOut`. `RequireAuth`, `Layout`, and `LoginPage` consume this shared state.
+
+## Why This Application Uses Hooks
+
+Hooks let function components use React capabilities such as state and context, and let related behavior be packaged into reusable functions. A page can use a hook to get the data or action it needs without repeating setup code. In this project, hooks also give the API and authentication layers clear boundaries.
+
+- **Keep page components focused on the screen.** `DashboardPage` calls `useDashboard()` and renders its result instead of implementing the HTTP request itself.
+- **Reuse data behavior consistently.** `useMenu(filters)` defines how menu data is requested and keyed in the cache. Any page using that hook follows the same behavior.
+- **Centralize updates after changes.** Mutation hooks such as `useCreateMenuItem()` both send the change and invalidate menu queries on success. Pages do not each need to remember how to refresh that data.
+- **Share application behavior.** `useAuth()` gives components a consistent way to access sign-in state and actions from context, while enforcing that they are rendered under `AuthProvider`.
+- **Keep stateful logic associated with its owner.** Built-in hooks such as `useState` keep interactive values in the component that uses them; shared state is exposed through a custom hook when appropriate.
+
+The application uses both React hooks (`useState`, `useEffect`, `useContext`, `useMemo`, and `useCallback`) and TanStack Query hooks (`useQuery`, `useMutation`, and `useQueryClient`). Custom hooks such as `useMenu`, `useCreateMenuItem`, and `useAuth` compose those APIs into application-specific operations. Hooks are called at the top level of function components or other hooks, not conditionally inside loops or event handlers, so React can associate hook state with the right component consistently.
 
 ## API Data and Mutations
 
@@ -102,6 +129,78 @@ JSX can include JavaScript expressions in braces. The app uses these expressions
 - Each repeated element has a stable `key` (usually an API id or unique name) so React can track which item changed between renders.
 
 For example, `DashboardPage` maps dashboard stats into `StatCard` components and maps latest orders into order rows.
+
+## Basic React Questions and Answers
+
+### 1. What is React?
+
+React is a JavaScript library for building user interfaces from reusable components. In this project, React renders the dashboard and guest-ordering screens and updates them when state or API data changes.
+
+### 2. What is a React component?
+
+A component is a reusable unit of UI, usually a function that returns JSX. `DashboardPage`, `Layout`, and `StatusPill` are examples. Components can be composed by rendering smaller components inside larger ones.
+
+### 3. What is JSX?
+
+JSX is syntax for describing UI inside JavaScript or TypeScript. It resembles HTML, but supports JavaScript expressions inside braces. The pages use JSX to render values such as order details and to conditionally show loading and error states.
+
+### 4. What is the difference between props and state?
+
+Props are inputs passed from a parent component and should be treated as read-only by the child. State is data a component owns and updates over time. For example, `StatCard` receives a `stat` prop, while `LoginPage` owns the username and password state it changes as the user types.
+
+### 5. What is a hook?
+
+A hook is a function that lets a function component use React features or reusable stateful behavior. Built-in hooks include `useState` and `useEffect`; this project also defines custom hooks such as `useAuth` and `useMenu`. Hooks must be called at the top level of a component or another hook.
+
+### 6. When does a component re-render?
+
+A component can render again when its state changes, its parent renders with updated props, or a context or subscribed query value it uses changes. For example, updating the guest cart changes `GuestPage` state, so React renders the cart and total with the new values.
+
+### 7. Why does React need a `key` when rendering a list?
+
+A key gives each item a stable identity so React can match items between renders and update the correct elements. This project uses IDs or unique names as keys when mapping menu items, orders, and cart lines.
+
+### 8. What is a controlled input?
+
+A controlled input gets its displayed `value` from React state and updates that state through an event handler such as `onChange`. The login fields in `LoginPage` use this pattern, keeping the input values available to React when the form is submitted.
+
+### 9. What is the difference between local state and server state in this app?
+
+Local state is temporary UI data, such as the selected menu filter or guest cart, and is managed with React hooks such as `useState`. Server state comes from the API, such as menu items and orders, and is managed by TanStack Query so it can be cached, refreshed, and invalidated after changes.
+
+## Advanced React Questions and Answers
+
+### 1. How does TanStack Query decide whether two requests use the same cached data?
+
+It identifies a query by its `queryKey`. Keys should include every input that changes the result. In `useMenu`, the key is `['menu', filters]`, so a different category or search term represents a different result set. Bill data similarly uses the order number and bill format in its key.
+
+### 2. Why invalidate queries after a mutation instead of manually changing every page?
+
+Invalidation marks matching cached data stale so TanStack Query can refetch it for active subscribers. This keeps different screens consistent without each screen implementing its own update logic. For example, creating or deleting a menu item invalidates menu queries; placing a guest order invalidates both order and table queries.
+
+### 3. What does `staleTime` mean, and how is it different from cache lifetime?
+
+`staleTime` determines how long fetched data is considered fresh. Here, it is 15 seconds. Once stale, the data can be refetched when a query is used or another refetch trigger occurs. Stale does not mean immediately deleted: cached data can remain available while TanStack Query decides when to refresh or remove it.
+
+### 4. Why is authentication stored in Context while API results use TanStack Query?
+
+Authentication is a small shared application state needed by routes and the header: the current user, status, and sign-in/sign-out actions. Context exposes it across the component tree. API resources such as menu items and orders have fetching, caching, loading, error, and invalidation needs, so TanStack Query manages them. Separating these concerns avoids turning Context into a general-purpose server-data cache.
+
+### 5. What are `useMemo` and `useCallback` doing in this project, and what do they not do?
+
+`useMemo` preserves a calculated value until its dependencies change; `useCallback` preserves a function reference until its dependencies change. `GuestPage` memoizes the cart total based on the cart and add-ons. `AuthProvider` uses callbacks for sign-in/sign-out and memoizes the context value. These hooks do not make incorrect dependency lists safe, and they should not be added everywhere by default; the dependencies must describe the values the calculation or function uses.
+
+### 6. When should an effect be used instead of calculating a value during render?
+
+An effect synchronizes a component with something outside the render calculation, such as a network request, browser API, or subscription. `AuthProvider` uses an effect to validate a previously saved token with `/auth/me` when the provider starts. Values that can be calculated from current props or state, such as the guest cart total, belong in render logic (and may be memoized only when useful), not in an effect that copies them into another state variable.
+
+### 7. How do nested routes compose shared UI and access control?
+
+The route tree in `App.tsx` nests staff pages under `RequireAuth` and `Layout`. `RequireAuth` controls whether the nested route is allowed, while `Layout` renders shared navigation and an `Outlet` for the selected child page. This keeps access checks and common page chrome in one place instead of repeating them in every staff screen.
+
+### 8. Why is the `QueryClient` created outside the component tree?
+
+The client owns the shared query cache and should persist while React components render. Creating it at module scope in `main.tsx` avoids constructing a fresh cache on each render. `QueryClientProvider` then makes that one instance available to query hooks throughout the app.
 
 ## TypeScript with React
 
