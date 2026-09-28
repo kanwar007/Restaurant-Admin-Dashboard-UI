@@ -1,9 +1,9 @@
 export const restaurant = {
   name: 'Café Admin',
   tagline: 'Restaurant Management',
-  gstin: '29ABCDE1234F1Z5',
-  address: '12 Brew Street, Indiranagar, Bengaluru 560038',
-  phone: '+91 80 4123 7788',
+  gstin: '',
+  address: 'Australia, Sydney',
+  phone: '1234567890',
   gstRate: 0.05,
 };
 
@@ -14,22 +14,8 @@ export const user = {
 };
 
 export const users = [
-  {
-    id: '1',
-    username: 'admin',
-    password: 'admin123',
-    name: 'Admin User',
-    role: 'Manager',
-    initials: 'AD',
-  },
-  {
-    id: '2',
-    username: 'cashier',
-    password: 'cashier123',
-    name: 'Riya Sharma',
-    role: 'Cashier',
-    initials: 'RS',
-  },
+  { id: 'admin', username: 'admin', password: 'admin123', name: 'Admin User', role: 'Manager', initials: 'AD' },
+  { id: 'cashier', username: 'cashier', password: 'cashier123', name: 'Cashier User', role: 'Cashier', initials: 'CU' },
 ];
 
 export const categories = ['Coffee', 'Bakery', 'Salads', 'Sandwiches', 'Beverages'];
