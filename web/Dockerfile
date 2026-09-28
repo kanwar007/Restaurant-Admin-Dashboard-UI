@@ -6,7 +6,7 @@ COPY . .
 RUN npm run build
 
 FROM nginx:1.27-alpine
-ENV MOCK_API_UPSTREAM=http://cafe-admin-mock-api:4000
+ENV API_UPSTREAM=http://api-gateway:8080
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 8080

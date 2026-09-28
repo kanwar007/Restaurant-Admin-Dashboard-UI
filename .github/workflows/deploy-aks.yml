@@ -7,6 +7,14 @@ on:
         description: Image tag to build and deploy
         required: true
         default: latest
+      overlay:
+        description: Kustomize directory to apply
+        required: true
+        default: deploy/k8s/base
+        type: choice
+        options:
+          - deploy/k8s/base
+          - deploy/k8s/overlays/mock
 
 permissions:
   id-token: write
@@ -29,10 +37,13 @@ jobs:
       - name: Build images in ACR
         run: |
           az acr build -r "$ACR" -t "cafe-admin-web:$TAG" ./web
-          az acr build -r "$ACR" -t "cafe-admin-mock-api:$TAG" ./mock-api
+          if [ "$OVERLAY" = "deploy/k8s/overlays/mock" ]; then
+            az acr build -r "$ACR" -t "cafe-admin-mock-api:$TAG" ./mock-api
+          fi
         env:
           ACR: ${{ vars.ACR_NAME }}
           TAG: ${{ inputs.image_tag }}
+          OVERLAY: ${{ inputs.overlay }}
 
       - uses: azure/aks-set-context@v4
         with:
@@ -45,16 +56,20 @@ jobs:
 
       - name: Apply manifests
         run: |
-          cd deploy/k8s
-          kubectl kustomize . \
+          kubectl kustomize "$OVERLAY" \
             | sed "s#ACRNAME.azurecr.io/cafe-admin-web:latest#$ACR.azurecr.io/cafe-admin-web:$TAG#; \
                    s#ACRNAME.azurecr.io/cafe-admin-mock-api:latest#$ACR.azurecr.io/cafe-admin-mock-api:$TAG#" \
             | kubectl apply -f -
         env:
           ACR: ${{ vars.ACR_NAME }}
           TAG: ${{ inputs.image_tag }}
+          OVERLAY: ${{ inputs.overlay }}
 
       - name: Wait for rollout
         run: |
-          kubectl -n cafe-admin rollout status deployment/cafe-admin-mock-api --timeout=180s
+          if [ "$OVERLAY" = "deploy/k8s/overlays/mock" ]; then
+            kubectl -n cafe-admin rollout status deployment/cafe-admin-mock-api --timeout=180s
+          fi
           kubectl -n cafe-admin rollout status deployment/cafe-admin-web --timeout=180s
+        env:
+          OVERLAY: ${{ inputs.overlay }}

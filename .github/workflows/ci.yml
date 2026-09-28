@@ -76,5 +76,7 @@ jobs:
       - uses: azure/setup-kubectl@v4
         with:
           version: v1.31.0
-      - name: Render kustomization
-        run: kubectl kustomize deploy/k8s | tee /tmp/rendered.yaml | head -40
+      - name: Render base
+        run: kubectl kustomize deploy/k8s/base | head -40
+      - name: Render mock overlay
+        run: kubectl kustomize deploy/k8s/overlays/mock | head -40
